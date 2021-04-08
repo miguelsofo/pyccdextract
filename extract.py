@@ -3,6 +3,7 @@ from astropy.io import fits
 from datetime import datetime
 import matplotlib.pyplot as plt 
 import numpy as np
+import math
 import sys
 import h5py
 import os.path
@@ -215,7 +216,7 @@ def doflag(pixels,satvalue):
 
 def getThr(g,n,i):
     # Skipper-CCD:
-    if g[i]==np.nan:
+    if math.isnan(g[i]):
         # Regular-CCD:
         return n[i]*4.0,n[i]*3.0
     else:
