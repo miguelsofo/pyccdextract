@@ -205,7 +205,7 @@ def extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue):
     return [iid,ohdu,flag,xMin,xMax,yMin,yMax,e,ee,eq,n,xBary,yBary,xVar,yVar,xPix,yPix,ePix,eePix]
 
 def doflag(pixels,satvalue):
-    flag=int('00000000',2)
+    flag=int('00000000',2) # flag=0 is the perfect event.
     # Check NaN values
     if np.sum(np.isnan(pixels))>0:
         flag = flag | int('00000001',2)
