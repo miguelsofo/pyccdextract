@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt 
+import matplotlib as matplt
 import numpy as np
 import h5py
 
 def plot_spectrum(ds,cut):
     qs=ds['q'][cut]
-    nbins=int(np.max(qs)/1000)
+    nbins=int(qs.size/100)
     hist,bins=np.histogram(qs,bins=nbins)
     bins=0.5*(bins[1:] + bins[:-1])
     fig=plt.figure()
@@ -25,6 +26,29 @@ def plot_correlation(ds,x,y,cut):
     plt.show()
     return 0
 
+def plot_events(f,events):
+    # Plot the events
+    xpix=f['hits/xpix']
+    ypix=f['hits/ypix']
+    pix=f['hits/pix']
+    xpix=xpix[events]
+    ypix=ypix[events]
+    pix=pix[events]
+    di=f['imgs_metadata']
+    img=np.zeros((di['nrow'][0],di['ncol'][0]))
+    img[np.concatenate(ypix),np.concatenate(xpix)]=np.concatenate(pix)
+    
+    fig=plt.figure()
+    cmap=matplt.cm.jet
+    cmap.set_under('white')
+    plt.imshow(img,vmin=0.1,vmax=np.max(img),cmap=cmap)
+    cbar=plt.colorbar()
+    cbar.set_label('value',fontsize=14)
+    plt.grid()
+    plt.xlabel('x (pixel)',fontsize=14)
+    plt.ylabel('y (pixel)',fontsize=14)
+    plt.show()
+    return 0
 
 # ========================================
 # http://docs.h5py.org/en/stable/quick.html
@@ -32,7 +56,9 @@ def plot_correlation(ds,x,y,cut):
 # https://www.christopherlovell.co.uk/blog/2016/04/27/h5py-intro.html
 
 # input file:
-fevents="/Users/kiwi/Documents/PROYECTOS/tesis_nicolas_ib/events.hdf5"
+#fevents="/Users/kiwi/Documents/PROYECTOS/tesis_nicolas_ib/events.hdf5"
+fevents="/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays_skp/iw30/proc/events.hdf5"
+fevents="/Volumes/ExtremeSSD/datos-ACDS/imgs_rnd/proc/events.hdf5"
 f = h5py.File(fevents,"r")
 print("Groups in the HDF5: ",f.keys())
 print("Datasets in group 'hits': ",f['hits'].keys())
@@ -49,13 +75,16 @@ print("dataset type: ",ds.dtype)
 #print(ds[...]) # Print all dataset content
 #print(ds['q'][...]) # Print only the 'q' column of the dataset
 
+ohdu=0
 # Spectrum plot
-cut=(ds['q']>5.) & (ds['ohdu']==0) & (ds['flag']==0) 
+cut=(ds['q']<5e7) & (ds['ohdu']==ohdu) & (ds['flag']==0) 
 plot_spectrum(ds,cut)
 
 # Correlation plot
-cut=(ds['q']<1.8e6) & (ds['ohdu']==0) & (ds['flag']==0) 
+cut=(ds['q']<1.8e6) & (ds['ohdu']==ohdu) & (ds['flag']==0) 
 plot_correlation(ds,'q','npix',cut)
+
+plot_events(f,cut)
 
 ## Create a HDF5 with a subset:
 #cut=(ds['q']<1.8e6) & (ds['ohdu']==0) & (ds['flag']==0) 
@@ -67,6 +96,7 @@ plot_correlation(ds,'q','npix',cut)
 #    hits_group.create_dataset(i,f["hits/"+ds_name][cut],dtype=f[ds_name].dtype)
 #fnew.close()
 ##
+
 exit()
 
 # Arrays with event information

@@ -1,4 +1,4 @@
-import extract
+import extract_nico
 
 config = {
     #"in_folder":"/Users/kiwi/Documents/PROYECTOS/DM2/datos/DM2-16Mar2020_toti-BRC_2",
@@ -37,8 +37,44 @@ config = {
     #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/xray-IW-scan/IW200/proc/events_IW200.hdf5",
     #"noise":[13.0,15.0,16.0,18.0] # HDU noise in ADU
     
-    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/xray-IW-scan/IW300/proc",
-    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/xray-IW-scan/IW300/proc/events_IW300.hdf5",
-    #"noise":[12.0,20.0,20.0,20.0] # HDU noise in ADU
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW30/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW30/proc/events.hdf5",
+    #"noise":[170,170,170,170] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW40/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW40/proc/events.hdf5",
+    #"noise":[220,220,220,220] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW50/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW50/proc/events.hdf5",
+    #"noise":[250,250,250,250] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW60/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW60/proc/events.hdf5",
+    #"noise":[290,290,290,290] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW100/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW100/proc/events.hdf5",
+    #"noise":[430,430,430,430] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW120/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW120/proc/events.hdf5",
+    #"noise":[475,475,475,475] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW200/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_buff_xrays/IW200/proc/events.hdf5",
+    #"noise":[720,720,720,720] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays/iw200/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays/iw200/proc/events.hdf5",
+    #"noise":[160,160,160,160] # HDU noise in ADU
+    
+    #"in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays_skp/iw30/proc",
+    #"out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays_skp/iw30/proc/events.hdf5",
+    #"noise":[320,320,320,320] # HDU noise in ADU
+    
+    "in_folder":"/Volumes/ExtremeSSD/datos-ACDS/imgs_rnd/proc",
+    "out_file":"/Volumes/ExtremeSSD/datos-ACDS/imgs_rnd/proc/events.hdf5",
+    "noise":[2050,2050,2050,2050] # HDU noise in ADU
 }
-extract.runExtract(config)
+extract_nico.runExtract(config)

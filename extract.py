@@ -1,4 +1,8 @@
-from scipy import ndimage
+from skimage.measure import label, regionprops, regionprops_table
+from skimage.filters import apply_hysteresis_threshold
+from skimage.segmentation import clear_border
+
+#from scipy import ndimage
 from astropy.io import fits
 from datetime import datetime
 import matplotlib.pyplot as plt 
@@ -147,65 +151,8 @@ def fillHDF5_imgsmtdt(filename,imgsmtdt):
             ds_imgs['imgid',-1]=img[8]
     return 0
 
-def extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue):
-    print("\nDoing HDU #",hdu)        
-    image = hdul[hdu].data
-    # Check for NaN pixels
-    print(np.sum(np.isnan(image))," NaN pixels")
-    # Extract
-    label_im, nb_labels = ndimage.label(image>=T2,structure=[[1,1,1],[1,1,1],[1,1,1]])
-    labels=np.arange(1,nb_labels+1,dtype=label_im.dtype)
-    labelmax=ndimage.maximum(image,labels=label_im,index=labels) # Maximum of each region.
-    labelsT1=labels[labelmax>=T1] # Regions that have at least one pixel with value higher than T1.
-    nevents=labelsT1.size
-    print(nevents," events")
-    # Analysis of each region (event):
-    iid=np.zeros(nevents)
-    ohdu=np.zeros(nevents)
-    flag=np.zeros(nevents)
-    xMin=np.zeros(nevents)
-    xMax=np.zeros(nevents)
-    yMin=np.zeros(nevents)
-    yMax=np.zeros(nevents)
-    e=np.zeros(nevents)  # (adu) event charge
-    ee=np.zeros(nevents) # (electrons) event charge
-    eq=np.zeros(nevents) # (electrons) quantized event charge
-    n=np.zeros(nevents)
-    xBary=np.zeros(nevents)
-    yBary=np.zeros(nevents)
-    xVar=np.zeros(nevents)
-    yVar=np.zeros(nevents)
-    xPix=[]
-    yPix=[]
-    ePix=[]
-    eePix=[]
-    for lid in range(0,labelsT1.size): # Loop over each extracted event
-        xy=np.where(label_im==(lid+1))
-        pixels=image[xy]
-        #Fill the numpy arrays:
-        iid[lid]=imgid
-        ohdu[lid]=hdu
-        flag[lid]=doflag(pixels,satvalue)
-        xMin[lid]=np.min(xy[1])
-        xMax[lid]=np.max(xy[1])
-        yMin[lid]=np.min(xy[0])
-        yMax[lid]=np.max(xy[0])
-        e[lid]=np.sum(pixels) # Event charge in ADU
-        ee[lid]=np.sum(pixels/gain) # Event charge in electrons
-        eq[lid]=np.sum(np.around(pixels/gain)) # Quantized event charge 
-        n[lid]=pixels.size
-        xBary[lid]=np.sum(xy[1]*pixels)/e[lid]
-        yBary[lid]=np.sum(xy[0]*pixels)/e[lid]
-        xVar[lid]=np.sum((xy[1]-xBary[lid])*(xy[1]-xBary[lid])*pixels)/e[lid]
-        yVar[lid]=np.sum((xy[0]-yBary[lid])*(xy[0]-yBary[lid])*pixels)/e[lid]
-        xPix.append(xy[1])
-        yPix.append(xy[0])
-        ePix.append(pixels)
-        eePix.append(pixels/gain)
-    return [iid,ohdu,flag,xMin,xMax,yMin,yMax,e,ee,eq,n,xBary,yBary,xVar,yVar,xPix,yPix,ePix,eePix]
-
 def doflag(pixels,satvalue):
-    flag=int('00000000',2) # flag=0 is the perfect event.
+    flag=int('00000000',2)
     # Check NaN values
     if np.sum(np.isnan(pixels))>0:
         flag = flag | int('00000001',2)
@@ -291,3 +238,38 @@ def query_yes_no(question, default="no"):
             sys.stdout.write("Please respond with 'yes' or 'no' "
                              "(or 'y' or 'n').\n")
     return 0
+
+def extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue):
+    print("\nDoing HDU #",hdu)        
+    image = hdul[hdu].data
+    # Check for NaN pixels
+    print(np.sum(np.isnan(image))," NaN pixels")
+    # get the mask via hysteresis threshold and remove events in borders
+    mask = apply_hysteresis_threshold(image, T2, T1)
+    #clear_border(mask, in_place=True)
+    # get the labels
+    label_im, nevents = label(mask, connectivity=2, return_num=True)
+    print('> Found {} different regions'.format(nevents))
+    # Analysis of each region (event):
+    props = regionprops_table(label_im, intensity_image=image, properties=('area', 'coords', 'intensity_image', 'label', 'weighted_centroid', 'weighted_moments_central', 'bbox'))
+    # the important vectors
+    iid = props['label']
+    ohdu = np.ones(nevents)*hdu
+    xMin = props['bbox-1']
+    xMax = props['bbox-3']-1
+    yMin = props['bbox-0']
+    yMax = props['bbox-2']-1
+    e = props['weighted_moments_central-0-0']
+    ee = e/gain
+    n = props['area']
+    xBary = props['weighted_centroid-1']
+    yBary = props['weighted_centroid-0']
+    xVar = props['weighted_moments_central-0-2']/e
+    yVar = props['weighted_moments_central-2-0']/e
+    yPix, xPix = [ [ props['coords'][i][:,j] for i in range(nevents)] for j in [0,1]]
+    ePix = [ image[(yPix[i], xPix[i])] for i in range(nevents) ]
+    eePix = [ ePix[i]/gain for i in range(nevents) ]
+    flag = np.array([doflag(ePix[i],satvalue) for i in range(nevents)])
+    eq = np.array( [np.around(ePix[i]/gain).sum() for i in range(nevents)])
+    # all done
+    return [iid,ohdu,flag,xMin,xMax,yMin,yMax,e,ee,eq,n,xBary,yBary,xVar,yVar,xPix,yPix,ePix,eePix]
