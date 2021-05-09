@@ -11,55 +11,52 @@ import math
 import sys
 import h5py
 import os.path
-
-def getsatvalues(imgsmtdt):
-    satvalues=[]
-    nhdu=len(fits.open(imgsmtdt[0][0]))
-    hdumax=np.zeros(nhdu)
-    print("Getting saturation values...")
-    for img in imgsmtdt: #Loop over each image
-        hdul = fits.open(img[0]) # read the image
-        for hdu in range(0,nhdu): # loop over image hdus
-            tmpmax=np.max(hdul[hdu].data)
-            if tmpmax>hdumax[hdu]:
-                hdumax[hdu]=tmpmax
-    hdumax=hdumax*0.95
-    print(hdumax)
-    print("...done\n")
-    return hdumax
+import pandas as pd
 
 def runExtract(config):
-    # Read configuration:
-    n=config["noise"] # Noise of each CCD amplifier (extension). 
-    try: 
-        g=config["gain"] # (ADU/e) Gain of each CCD amplifier (extension).
+    # -----------------------------------------------------------     
+    try:
+        outfile=config["out_file"] # Output file.
     except:
-        print("GAIN values not provied.")
-        print("Extraction of regular-CCD images.")
-        g=np.ones(len(n))*np.nan
-    imgsmtdt=get_images(config["in_folder"]) # Input images.
-    outfile=config["out_file"] # Output file.
-    # Start extraction process: 
+        print('Please provide an output file name. Bye.')
+        exit()
     initOutFile(outfile) # Check and init the output HDF5 file.
-    # Loop over the input images: 
-    satvalues=getsatvalues(imgsmtdt)
-    print("Saturation values in electrons: ")
-    print(satvalues/g)
-    for img in imgsmtdt:
-        imgname=img[0]
+    # -----------------------------------------------------------         
+    try: 
+        extinput=config["input"]
+    except:
+        print('Please provide an input. Bye')
+        exit()
+    idf=read_folder(config) # Generates images metadata.
+    idf.to_csv(outfile.rsplit('/',1)[0]+'/imgs_metadata.csv')
+    # -----------------------------------------------------------     
+    # Start extraction process: 
+    # Loop over the images: 
+    for i in idf.index:
+        imgname=idf['img'][i]
+        imgid=idf['imgid'][i] # image ID from image metadata.
         print("\n===============================================================")
         print(imgname)
         hdul = fits.open(imgname)
-        if len(hdul)>len(g): # Check if the number of HDUs agrees with the number of gains.
-            print("This image have more HDUs than gains in the config file.")
-            print("Using only first {} ones out of {}.".format(len(g),len(hdul)));
-        imgid=img[8] # image ID from image metadata.
-        for hdu in range(0,len(g)):
-            T1,T2=getThr(g,n,hdu)
-            events=extract_hdu(imgid,hdul,hdu,T1,T2,g[hdu],satvalues[hdu])
+        for hdu in range(0,len(hdul)):
+            T1=idf['T1_'+str(hdu)][i]
+            T2=idf['T2_'+str(hdu)][i]
+            gain=idf['gain_'+str(hdu)][i]
+            satvalue=idf['satValue'][i]
+            events=extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue)
             fillHDF5(outfile,events)
-    fillHDF5_imgsmtdt(outfile,imgsmtdt) # Fill HDF5 with images metadata.
+    fillHDF5_imgsmtdt(outfile,idf) # Fill HDF5 with images metadata.
     return 0
+
+def get_satvalue(imgname):
+    hdul = fits.open(imgname) # read the image
+    hdumax=np.zeros(len(hdul))
+    for hdu in range(0,len(hdul)): # loop over image hdus
+        tmpmax=np.max(hdul[hdu].data)
+        if tmpmax>hdumax[hdu]:
+            hdumax[hdu]=tmpmax
+    hdumax=hdumax*0.95
+    return np.min(hdumax)
 
 def initHDF5(filename):
     with h5py.File(filename, "w") as f:
@@ -95,8 +92,8 @@ def initHDF5(filename):
         ds_pix = hits.create_dataset('pix',(0,),dtype=dt_pix,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
         ds_epix = hits.create_dataset('epix',(0,),dtype=dt_epix,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
         # Create a data-set for images metadata:
-        dt_imgs=np.dtype([('img',np.dtype('S100')),('ncol',np.dtype('int32')),('nrow',np.dtype('int32')),('ccdncol',np.dtype('int32')),('ccdnrow',np.dtype('int32')),('start',np.dtype('S100')),('end',np.dtype('S100')),('rotime',np.dtype('float32')),('imgid',np.dtype('int32'))])
-        ds_imgs=f.create_dataset('imgs_metadata',(0,),dtype=dt_imgs,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
+        #dt_imgs=np.dtype([('img',np.dtype('S100')),('ncol',np.dtype('int32')),('nrow',np.dtype('int32')),('ccdncol',np.dtype('int32')),('ccdnrow',np.dtype('int32')),('start',np.dtype('S100')),('end',np.dtype('S100')),('rotime',np.dtype('float32')),('imgid',np.dtype('int32'))])
+        #ds_imgs=f.create_dataset('imgs_metadata',(0,),dtype=dt_imgs,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
     return 0
 
 def fillHDF5(filename,events):
@@ -136,19 +133,8 @@ def fillHDF5(filename,events):
     return 0
 
 def fillHDF5_imgsmtdt(filename,imgsmtdt):
-    with h5py.File(filename, "r+") as f:
-        ds_imgs=f['imgs_metadata']
-        for img in imgsmtdt:
-            ds_imgs.resize((ds_imgs.shape[0]+1,))
-            ds_imgs['img',-1]=img[0]
-            ds_imgs['ncol',-1]=img[1]
-            ds_imgs['nrow',-1]=img[2]
-            ds_imgs['ccdncol',-1]=img[3]
-            ds_imgs['ccdnrow',-1]=img[4]
-            ds_imgs['start',-1]=img[5]
-            ds_imgs['end',-1]=img[6]
-            ds_imgs['rotime',-1]=img[7]
-            ds_imgs['imgid',-1]=img[8]
+    hdf=pd.HDFStore(filename,'r+')
+    hdf.put('/imgs_metadata',imgsmtdt)
     return 0
 
 def doflag(pixels,satvalue):
@@ -161,15 +147,14 @@ def doflag(pixels,satvalue):
         flag = flag | int('00000010',2)
     return flag
 
-def getThr(g,n,i):
+def getThr(g,n):
     # Skipper-CCD:
-    if math.isnan(g[i]):
+    if math.isnan(g):
         # Regular-CCD:
-        return n[i]*4.0,n[i]*3.0
+        return n*4.0,n*3.0
     else:
-        T1=g[i]/2.0
-        T2=g[i]/2.0
-        return T1,T2
+        # Skipper-CCD
+        return g/2.0,g/2.0
 
 def initOutFile(outfile):
     if os.path.exists(outfile):
@@ -183,28 +168,132 @@ def initOutFile(outfile):
         initHDF5(outfile)
     return 0
 
-def get_images(folder):
+def check_imgs(images):
+    # This routine check if all images have the same number of hdu.
+    nhdu=np.zeros(len(images))
+    for i in range(0,len(images)):
+        nhdu[i]=len(fits.open(images[i]))
+    res=np.all(nhdu==nhdu[0])
+    if res:
+        print("All images have %d HDUs."%nhdu[0])
+    else:
+        print("The images does not have the same number of HDUs. Not allowed")
+        exit()
+    return int(nhdu[0])
+
+def read_folder(config):
+    folder=config['input']
+    if not os.path.exists(folder):
+        print("The input folder does not exist. Bye...")
+        exit()
+    # -----------------------------------------------------------    
+    # List of images:
     images=[]
     for filename in os.listdir(folder):
         if filename.endswith(".fits") or filename.endswith(".fits.bz2"):
             images.append(folder+"/"+filename)
+    nhdu=check_imgs(images) # Check if all images have the same number of HDUs
+    # -----------------------------------------------------------    
+    try:
+        n=config["noise"] # Noise of each CCD amplifier (extension). 
+    except:
+        print("Please provide a vector with the noise of each HDU.")
+        exit()
+    if(len(n)!=nhdu):
+        print("The vector length with the noises does not match the number of HDUs of the images.")
+        exit()
+    # -----------------------------------------------------------     
+    try: 
+        g=config["gain"] # (ADU/e) Gain of each CCD amplifier (extension).
+        print("Extraction of sub-electron noise images.")
+    except:
+        print("GAIN values not provied -> Extraction of regular-CCD images.")
+        g=np.ones(len(n))*np.nan
+    if(len(g)!=nhdu):
+        print("The vector length with the gains does not match the number of HDUs of the images.")
+        exit()
+    # -----------------------------------------------------------     
+    hdr=[]
+    try:
+        hdr=config['hdr']
+    except:
+        print("No additional header words provided.")
+    # -----------------------------------------------------------     
+    imgs_mtdt=get_imgsdf(images,hdr)  
+    # -----------------------------------------------------------     
+    # Append additional data necessary during extraction.
+    for i in range(nhdu):
+        imgs_mtdt["std_"+str(i)]=np.ones(len(imgs_mtdt['img']))*n[i]
+        imgs_mtdt["gain_"+str(i)]=np.ones(len(imgs_mtdt['img']))*g[i]
+        T1,T2=getThr(g[i],n[i])
+        imgs_mtdt["T1_"+str(i)]=np.ones(len(imgs_mtdt['img']))*T1
+        imgs_mtdt["T2_"+str(i)]=np.ones(len(imgs_mtdt['img']))*T2
+    return imgs_mtdt
+
+def get_imgsdf(images,hdr=[]):
+    # images: list of images to process. 
+    # hdr: list of additional header words that you want to include in the images metadata.
+    # Init dataframe:
+    column_names=['img','imgid','ncol','nrow','ccdncol','ccdnrow','dateStart','dateEnd','roTime','pixrot','satValue']
+    if len(hdr)>0:
+        column_names.append(hdr)
+    df=pd.DataFrame(columns=column_names)
     # Extract adquisition time from image header
-    imgsmtdt=[] # images metadata.
-    for i in images:
-        hdul = fits.open(i)
-        ncol=hdul[0].header['NCOL']
-        nrow=hdul[0].header['NROW']
-        ccdncol=hdul[0].header['CCDNCOL']
-        ccdnrow=hdul[0].header['CCDNROW']
-        dateStart=datetime.strptime(hdul[0].header['DATESTART'],"%Y-%m-%dT%H:%M:%S")
-        dateEnd=datetime.strptime(hdul[0].header['DATEEND'],"%Y-%m-%dT%H:%M:%S")
-        rotime=(dateEnd-dateStart).total_seconds()
-        imgsmtdt.append([i,ncol,nrow,ccdncol,ccdnrow,dateStart,dateEnd,rotime])
+    for i in range(len(images)):
+        imgname=images[i]
+        hdul = fits.open(imgname)
+        df.loc[i,'img']=imgname
+        df.loc[i,'imgid']=i
+        df.loc[i,'ncol']=float(hdul[0].header['NCOL'])
+        df.loc[i,'nrow']=float(hdul[0].header['NROW'])
+        df.loc[i,'ccdncol']=float(hdul[0].header['CCDNCOL'])
+        df.loc[i,'ccdnrow']=float(hdul[0].header['CCDNROW'])
+        df.loc[i,'dateStart']=datetime.strptime(hdul[0].header['DATESTART'],"%Y-%m-%dT%H:%M:%S")
+        df.loc[i,'dateEnd']=datetime.strptime(hdul[0].header['DATEEND'],"%Y-%m-%dT%H:%M:%S")
+        df.loc[i,'roTime']=(df.loc[i,'dateEnd']-df.loc[i,'dateStart']).total_seconds()
+        df.loc[i,'pixrot']=(df.loc[i,'nrow']*1e3)/(df.loc[i,'ncol']*df.loc[i,'nrow'])
+        df.loc[i,'satValue']=get_satvalue(df.loc[i,'img'])
+        # Add additional headers:
+        for h in hdr:
+            df.loc[i,h]=hdul[0].header[h]
         hdul.close()
-    imgsmtdt.sort(key=lambda x : x[5]) # Sort the images (older first)
-    for x in range(0,len(imgsmtdt)): # Append image ID
-        imgsmtdt[x].append(x)
-    return imgsmtdt
+    df.info()
+    return df
+
+def extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue):
+    print("\nDoing HDU #",hdu)        
+    image = hdul[hdu].data
+    # Check for NaN pixels
+    print(np.sum(np.isnan(image))," NaN pixels")
+    # get the mask via hysteresis threshold and remove events in borders
+    mask = apply_hysteresis_threshold(image,float(T2),float(T1))
+    #clear_border(mask, in_place=True)
+    # get the labels
+    label_im, nevents = label(mask, connectivity=2, return_num=True)
+    print('> Found {} different regions'.format(nevents))
+    # Analysis of each region (event):
+    props = regionprops_table(label_im, intensity_image=image, properties=('area', 'coords', 'intensity_image', 'label', 'weighted_centroid', 'weighted_moments_central', 'bbox'))
+    # the important vectors
+    iid = props['label']
+    ohdu = np.ones(nevents)*hdu
+    xMin = props['bbox-1']
+    xMax = props['bbox-3']-1
+    yMin = props['bbox-0']
+    yMax = props['bbox-2']-1
+    e = props['weighted_moments_central-0-0']
+    ee = e/gain
+    n = props['area']
+    xBary = props['weighted_centroid-1']
+    yBary = props['weighted_centroid-0']
+    xVar = props['weighted_moments_central-0-2']/e
+    yVar = props['weighted_moments_central-2-0']/e
+    yPix, xPix = [ [ props['coords'][i][:,j] for i in range(nevents)] for j in [0,1]]
+    ePix = [ image[(yPix[i], xPix[i])] for i in range(nevents) ]
+    eePix = [ ePix[i]/gain for i in range(nevents) ]
+    flag = np.array([doflag(ePix[i],satvalue) for i in range(nevents)])
+    eq = np.array( [np.around(ePix[i]/gain).sum() for i in range(nevents)])
+    # all done
+    return [iid,ohdu,flag,xMin,xMax,yMin,yMax,e,ee,eq,n,xBary,yBary,xVar,yVar,xPix,yPix,ePix,eePix]
 
 def query_yes_no(question, default="no"):
     """Ask a yes/no question via raw_input() and return their answer.
@@ -238,38 +327,3 @@ def query_yes_no(question, default="no"):
             sys.stdout.write("Please respond with 'yes' or 'no' "
                              "(or 'y' or 'n').\n")
     return 0
-
-def extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue):
-    print("\nDoing HDU #",hdu)        
-    image = hdul[hdu].data
-    # Check for NaN pixels
-    print(np.sum(np.isnan(image))," NaN pixels")
-    # get the mask via hysteresis threshold and remove events in borders
-    mask = apply_hysteresis_threshold(image, T2, T1)
-    #clear_border(mask, in_place=True)
-    # get the labels
-    label_im, nevents = label(mask, connectivity=2, return_num=True)
-    print('> Found {} different regions'.format(nevents))
-    # Analysis of each region (event):
-    props = regionprops_table(label_im, intensity_image=image, properties=('area', 'coords', 'intensity_image', 'label', 'weighted_centroid', 'weighted_moments_central', 'bbox'))
-    # the important vectors
-    iid = props['label']
-    ohdu = np.ones(nevents)*hdu
-    xMin = props['bbox-1']
-    xMax = props['bbox-3']-1
-    yMin = props['bbox-0']
-    yMax = props['bbox-2']-1
-    e = props['weighted_moments_central-0-0']
-    ee = e/gain
-    n = props['area']
-    xBary = props['weighted_centroid-1']
-    yBary = props['weighted_centroid-0']
-    xVar = props['weighted_moments_central-0-2']/e
-    yVar = props['weighted_moments_central-2-0']/e
-    yPix, xPix = [ [ props['coords'][i][:,j] for i in range(nevents)] for j in [0,1]]
-    ePix = [ image[(yPix[i], xPix[i])] for i in range(nevents) ]
-    eePix = [ ePix[i]/gain for i in range(nevents) ]
-    flag = np.array([doflag(ePix[i],satvalue) for i in range(nevents)])
-    eq = np.array( [np.around(ePix[i]/gain).sum() for i in range(nevents)])
-    # all done
-    return [iid,ohdu,flag,xMin,xMax,yMin,yMax,e,ee,eq,n,xBary,yBary,xVar,yVar,xPix,yPix,ePix,eePix]

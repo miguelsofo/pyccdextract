@@ -56,9 +56,8 @@ def plot_events(f,events):
 # https://www.christopherlovell.co.uk/blog/2016/04/27/h5py-intro.html
 
 # input file:
-#fevents="/Users/kiwi/Documents/PROYECTOS/tesis_nicolas_ib/events.hdf5"
-fevents="/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays_skp/iw30/proc/events.hdf5"
-fevents="/Volumes/ExtremeSSD/datos-ACDS/imgs_rnd/proc/events.hdf5"
+fevents="/Volumes/ExtremeSSD/datos-ACDS/test/event.hdf5"
+
 f = h5py.File(fevents,"r")
 print("Groups in the HDF5: ",f.keys())
 print("Datasets in group 'hits': ",f['hits'].keys())
@@ -68,6 +67,9 @@ def printname(name):
     print(name)
 f.visit(printname) 
 
+idf=f['imgs_metadata']
+print(idf[...])
+exit()
 # Load a dataset
 ds=f['hits/parameters'] # ds becomes a numpy array. 
 print("dataset shape: ",ds.shape) # Print number of events
