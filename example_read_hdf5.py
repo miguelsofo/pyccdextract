@@ -67,9 +67,6 @@ def printname(name):
     print(name)
 f.visit(printname) 
 
-idf=f['imgs_metadata']
-print(idf[...])
-exit()
 # Load a dataset
 ds=f['hits/parameters'] # ds becomes a numpy array. 
 print("dataset shape: ",ds.shape) # Print number of events
@@ -87,17 +84,6 @@ cut=(ds['q']<1.8e6) & (ds['ohdu']==ohdu) & (ds['flag']==0)
 plot_correlation(ds,'q','npix',cut)
 
 plot_events(f,cut)
-
-## Create a HDF5 with a subset:
-#cut=(ds['q']<1.8e6) & (ds['ohdu']==0) & (ds['flag']==0) 
-#fnew = h5py.File("events_clean.hdf5", "w")
-#f.copy('imgs_metadata',fnew)
-#hits_group=fnew.create_group('hits')
-#for ds_name in f['hits'].keys(): 
-#    print(ds_name)
-#    hits_group.create_dataset(i,f["hits/"+ds_name][cut],dtype=f[ds_name].dtype)
-#fnew.close()
-##
 
 exit()
 
