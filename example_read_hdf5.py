@@ -3,9 +3,8 @@ import matplotlib as matplt
 import numpy as np
 import h5py
 
-def plot_spectrum(ds,cut):
+def plot_spectrum(ds,cut,nbins):
     qs=ds['q'][cut]
-    nbins=int(qs.size/100)
     hist,bins=np.histogram(qs,bins=nbins)
     bins=0.5*(bins[1:] + bins[:-1])
     fig=plt.figure()
@@ -56,7 +55,7 @@ def plot_events(f,events):
 # https://www.christopherlovell.co.uk/blog/2016/04/27/h5py-intro.html
 
 # input file:
-fevents="/Volumes/ExtremeSSD/datos-ACDS/test/event.hdf5"
+fevents="/Volumes/ExtremeSSD/datos-ACDS/imgs_acds_xrays_skp_loop2/iw20/proc/events.hdf5"
 
 f = h5py.File(fevents,"r")
 print("Groups in the HDF5: ",f.keys())
@@ -76,11 +75,11 @@ print("dataset type: ",ds.dtype)
 
 ohdu=0
 # Spectrum plot
-cut=(ds['q']<5e7) & (ds['ohdu']==ohdu) & (ds['flag']==0) 
-plot_spectrum(ds,cut)
+cut=(ds['q']<600e3) & (ds['ohdu']==ohdu) & (ds['flag']==0) 
+plot_spectrum(ds,cut,1000)
 
 # Correlation plot
-cut=(ds['q']<1.8e6) & (ds['ohdu']==ohdu) & (ds['flag']==0) 
+cut=(ds['q']<600e3) & (ds['ohdu']==ohdu) & (ds['flag']==0) 
 plot_correlation(ds,'q','npix',cut)
 
 plot_events(f,cut)

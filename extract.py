@@ -31,7 +31,6 @@ def runExtract(config):
         idf=read_csv(config)
     else:
         idf=read_folder(config) 
-    #idf.to_csv(outfile.rsplit('/',1)[0]+'/imgs_metadata.csv')
     # -----------------------------------------------------------     
     # Start extraction process: 
     # Loop over the images: 
@@ -44,9 +43,7 @@ def runExtract(config):
         for hdu in range(0,len(hdul)):
             T1=idf['T1_'+str(hdu)][i]
             T2=idf['T2_'+str(hdu)][i]
-            #gain=idf['gain_'+str(hdu)][i]
             satvalue=idf['satValue'][i]
-            #events=extract_hdu(imgid,hdul,hdu,T1,T2,gain,satvalue)
             events=extract_hdu(imgid,hdul,hdu,T1,T2,satvalue)
             if not events=='0-regions':
                 fillHDF5(outfile,events)
@@ -68,8 +65,6 @@ def initHDF5(filename):
         # (check: http://docs.h5py.org/en/stable/special.html)
         # You must have h5py > v2.3, or run with python3.6.
         dt_q=np.dtype('float32')
-        #dt_qe=np.dtype('float32')
-        #dt_qq=np.dtype('float32')
         dt_npix=np.dtype('int32')
         dt_flag=np.dtype('int8')
         dt_ohdu=np.dtype('int8')
@@ -82,23 +77,17 @@ def initHDF5(filename):
         dt_ybary=np.dtype('float32')
         dt_xvar=np.dtype('float32')
         dt_yvar=np.dtype('float32')
-        #dt_param=np.dtype([('q',dt_q),('qe',dt_qe),('qq',dt_qq),('npix',dt_npix),('flag',dt_flag),('ohdu',dt_ohdu),('imgid',dt_imgid),('xmin',dt_xmin),('xmax',dt_xmax),('ymin',dt_ymin),('ymax',dt_ymax),('xbary',dt_xbary),('ybary',dt_ybary),('xvar',dt_xvar),('yvar',dt_yvar)])
         dt_param=np.dtype([('q',dt_q),('npix',dt_npix),('flag',dt_flag),('ohdu',dt_ohdu),('imgid',dt_imgid),('xmin',dt_xmin),('xmax',dt_xmax),('ymin',dt_ymin),('ymax',dt_ymax),('xbary',dt_xbary),('ybary',dt_ybary),('xvar',dt_xvar),('yvar',dt_yvar)])
         # ... variable length data-types:
         dt_xpix=h5py.vlen_dtype(np.dtype('int32'))
         dt_ypix=h5py.vlen_dtype(np.dtype('int32'))
         dt_pix=h5py.vlen_dtype(np.dtype('float32'))
-        #dt_epix=h5py.vlen_dtype(np.dtype('float32'))
         # Create the *hits* group: it will have 4 datasets: the parameters and the xpix, ypix and pix arrays.
         hits = f.create_group('hits')
         ds_param = hits.create_dataset('parameters',(0,),dtype=dt_param,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
         ds_xpix = hits.create_dataset('xpix',(0,),dtype=dt_xpix,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
         ds_ypix = hits.create_dataset('ypix',(0,),dtype=dt_ypix,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
         ds_pix = hits.create_dataset('pix',(0,),dtype=dt_pix,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
-        #ds_epix = hits.create_dataset('epix',(0,),dtype=dt_epix,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
-        # Create a data-set for images metadata:
-        #dt_imgs=np.dtype([('img',np.dtype('S100')),('ncol',np.dtype('int32')),('nrow',np.dtype('int32')),('ccdncol',np.dtype('int32')),('ccdnrow',np.dtype('int32')),('start',np.dtype('S100')),('end',np.dtype('S100')),('rotime',np.dtype('float32')),('imgid',np.dtype('int32'))])
-        #ds_imgs=f.create_dataset('imgs_metadata',(0,),dtype=dt_imgs,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
     return 0
 
 def fillHDF5(filename,events):
@@ -108,13 +97,11 @@ def fillHDF5(filename,events):
         ds_xpix=f['hits/xpix']
         ds_ypix=f['hits/ypix']
         ds_pix=f['hits/pix']
-        #ds_epix=f['hits/epix']
         # Resize HDF5
         ds_param.resize((ds_param.shape[0]+ne,)) 
         ds_xpix.resize((ds_xpix.shape[0]+ne,)) 
         ds_ypix.resize((ds_ypix.shape[0]+ne,)) 
         ds_pix.resize((ds_pix.shape[0]+ne,)) 
-        #ds_epix.resize((ds_epix.shape[0]+ne,)) 
         # Fill HDF5
         ds_param['imgid',-ne:]=events[0]
         ds_param['ohdu',-ne:]=events[1]
@@ -124,8 +111,6 @@ def fillHDF5(filename,events):
         ds_param['ymin',-ne:]=events[5]
         ds_param['ymax',-ne:]=events[6]
         ds_param['q',-ne:]=events[7]
-        #ds_param['qe',-ne:]=events[8]
-        #ds_param['qq',-ne:]=events[9]
         ds_param['npix',-ne:]=events[8]
         ds_param['xbary',-ne:]=events[9]
         ds_param['ybary',-ne:]=events[10]
@@ -134,15 +119,10 @@ def fillHDF5(filename,events):
         ds_xpix[-ne:]=events[13]
         ds_ypix[-ne:]=events[14]
         ds_pix[-ne:]=events[15]
-        #ds_epix[-ne:]=events[18]
     return 0
 
 def fillHDF5_imgsmtdt(filename,imgsmtdt):
-    # Create a data-set for images metadata:
     imgsmtdt.to_csv(filename.rsplit('/',1)[0]+'/imgs_metadata.csv')
-    #with h5py.File(filename, "r+") as f:
-    #    ds_imgs=f.create_dataset('imgs_metadata',(0,),dtype=imgsmtdt.dtypes,maxshape=(None,),chunks=(500,),compression="gzip",compression_opts=9,shuffle=True)
-    #    ds_imgs=imgsmtdt.copy()
     return 0
 
 def doflag(pixels,satvalue):
@@ -154,15 +134,6 @@ def doflag(pixels,satvalue):
     if pixels[pixels>satvalue].size > 0:
         flag = flag | int('00000010',2)
     return flag
-
-#def getThr(g,n):
-#    # Skipper-CCD:
-#    if math.isnan(g):
-#        # Regular-CCD:
-#        return n*4.0,n*3.0
-#    else:
-#        # Skipper-CCD
-#        return g/2.0,g/2.0
 
 def initOutFile(outfile):
     if os.path.exists(outfile):
@@ -218,13 +189,8 @@ def read_csv(config):
     # Generate additional metadata: 
     imgs_mtdt=get_imgsdf(images)  
     # -----------------------------------------------------------     
-    # Append to the additional data necessary during extraction.
+    # Append T1, T2 and additional metadata from csv file.
     df_full=imgs_mtdt.merge(df,on='img')
-    #for i in range(nhdu):
-    #    if not ("gain_"+str(i)) in df_full:
-    #        df_full["gain_"+str(i)]=np.ones(len(df_full['img']))*np.nan
-    #    df_full["T1_"+str(i)]=df_full["std_"+str(i)]*4.0
-    #    df_full["T2_"+str(i)]=df_full["std_"+str(i)]*3.0 
     return df_full
 
 def read_folder(config):
@@ -254,7 +220,7 @@ def read_folder(config):
     try: 
         t2v=config["T2"] # T2 level of each CCD amplifier (extension). 
     except:
-        print("Not T2 level provided for extentions. Skipper-CCD images assumed.")
+        print("Not T2 level provided. Skipper-CCD images assumed (T2=T1).")
         t2v=t1v
     if(len(t2v)!=nhdu):
         print("Please provide T2 for all extentions.")
@@ -317,7 +283,8 @@ def extract_hdu(imgid,hdul,hdu,T1,T2,satvalue):
     # Analysis of each region (event):
     props = regionprops_table(label_im, intensity_image=image, properties=('area', 'coords', 'intensity_image', 'label', 'weighted_centroid', 'weighted_moments_central', 'bbox'))
     # the important vectors
-    iid = props['label']
+    #iid = props['label']
+    iid = np.ones(nevents)*(imgid)
     ohdu = np.ones(nevents)*hdu
     xMin = props['bbox-1']
     xMax = props['bbox-3']-1
